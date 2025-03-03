@@ -45,27 +45,32 @@ def newmark_beta(signal_length, nDOF, M, C, K, F, dt, beta=0.25, gamma=0.5):
     v = np.zeros((num_dof, num_steps))
     a = np.zeros((num_dof, num_steps))
 
-    # Effective stiffness matrix
-    K_eff = K + gamma / (beta * dt) * C + 1 / (beta * dt**2) * M
+    # Newmark Beta method coefficients
+    a0 = 1 / (beta * dt * dt)
+    a1 = gamma / (beta * dt)
+    a2 = 1 / (beta * dt)
+    a3 = 1 / (2 * beta) - 1
+    a4 = gamma / beta - 1
+    a5 = dt / 2 * (gamma / beta - 2)
+    a6 = dt * (1 - gamma)
+    a7 = dt * gamma
 
-    # Initial acceleration
-    # a[:, 0] = np.linalg.inv(M).dot(F[:, 0] - C.dot(v[:, 0]) - K.dot(u[:, 0]))
+    # Effective stiffness matrix
+    K_eff = K + a0 * M + a1 * C
     
     # Initial accleration put as zero
     a[:, 0] = np.zeros(num_dof)
 
-    # Time integration using Newmark-beta method
+    # # Time integration using Newmark-beta method
     for i in range(1, num_steps):
         # Compute effective force
-        F_eff = F[:, i] + M.dot(1 / (beta * dt**2) * u[:, i-1] + 1 / (beta * dt) * v[:, i-1] + (1 / (2 * beta) - 1) * a[:, i-1]) \
-                + C.dot(gamma / (beta * dt) * u[:, i-1] + (gamma / beta - 1) * v[:, i-1] + dt * (gamma / (2 * beta) - 1) * a[:, i-1])
+        F_eff = F[:, i] + M.dot(a0 * u[:, i-1] + a2 * v[:, i-1] + a3 * a[:, i-1]) \
+                + C.dot(a1 * u[:, i-1] + a4 * v[:, i-1] + a5 * a[:, i-1])
         
-        # Solve for displacement
+        # Solve
         u[:, i] = np.linalg.inv(K_eff).dot(F_eff)
-        
-        # Solve for velocity and acceleration
-        a[:, i] = 1 / (beta * dt**2) * (u[:, i] - u[:, i-1]) - 1 / (beta * dt) * v[:, i-1] - (1 / (2 * beta) - 1) * a[:, i-1]
-        v[:, i] = v[:, i-1] + dt * ((1 - gamma) * a[:, i-1] + gamma * a[:, i])
+        a[:, i] = a0 * (u[:, i] - u[:, i-1]) - a2 * v[:, i-1] - a3 * a[:, i-1]
+        v[:, i] = v[:, i-1] + a6 * a[:, i-1] + a7 * a[:, i]
 
     # for now only acceleration is returned
     return a
